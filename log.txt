@@ -471,4 +471,3 @@ Extracting ./datasets/MNIST\raw\t10k-labels-idx1-ubyte.gz to ./datasets/MNIST\ra
 [Epoch 49/50] [Batch 799/938] [D loss: 0.795938] [G loss: 1.781342] [D real: 0.650767] [D fake: 0.177466]
 [Epoch 49/50] [Batch 899/938] [D loss: 0.722858] [G loss: 1.229943] [D real: 0.730157] [D fake: 0.244866]
 
-进程已结束,退出代码0
