@@ -24,7 +24,7 @@ parser.add_argument("--batch_size", type=int, default=64, help="size of the batc
 parser.add_argument("--lr", type=float, default=0.0002, help="adam: learning rate")
 parser.add_argument("--b1", type=float, default=0.5, help="adam: decay of first order momentum of gradient")
 parser.add_argument("--b2", type=float, default=0.999, help="adam: decay of first order momentum of gradient")
-parser.add_argument("--n_cpu", type=int, default=1, help="number of cpu threads to use during batch generation")
+parser.add_argument("--n_gpu", type=int, default=1, help="number of cpu threads to use during batch generation")
 parser.add_argument("--latent_dim", type=int, default=100, help="dimensionality of the latent space")
 parser.add_argument("--img_size", type=int, default=28, help="size of each image dimension")
 parser.add_argument("--channels", type=int, default=1, help="number of image channels")
@@ -39,7 +39,8 @@ img_shape = (opt["channels"], opt["img_size"], opt["img_size"])
 img_area = np.prod(img_shape)
 
 ## 设置cuda:(cuda:0)
-cuda = True if torch.cuda.is_available() else False
+device = torch.device('cuda:0' if opt["n_gpu"] > 0 else 'cpu')
+print(device)
 
 ## mnist数据集下载
 mnist = datasets.MNIST(
@@ -124,9 +125,9 @@ optimizer_D = torch.optim.Adam(discriminator.parameters(), lr=opt["lr"], betas=(
 
 ## 如果有显卡，都在cuda模式中运行
 if torch.cuda.is_available():
-    generator = generator.cuda()
-    discriminator = discriminator.cuda()
-    criterion = criterion.cuda()
+    generator = generator.to(device)
+    discriminator = discriminator.to(device)
+    criterion = criterion.to(device)
 
 ## ----------
 ##  Training
@@ -142,9 +143,9 @@ for epoch in range(opt["n_epochs"]):  ## epoch:50
         ## =============================训练判别器==================
         ## view(): 相当于numpy中的reshape，重新定义矩阵的形状, 相当于reshape(128，784)  原来是(128, 1, 28, 28)
         imgs = imgs.view(imgs.size(0), -1)  ## 将图片展开为28*28=784  imgs:(64, 784)
-        real_img = Variable(imgs).cuda()  ## 将tensor变成Variable放入计算图中，tensor变成variable之后才能进行反向传播求梯度
-        real_label = Variable(torch.ones(imgs.size(0), 1)).cuda()  ## 定义真实的图片label为1
-        fake_label = Variable(torch.zeros(imgs.size(0), 1)).cuda()  ## 定义假的图片的label为0
+        real_img = Variable(imgs).to(device)  ## 将tensor变成Variable放入计算图中，tensor变成variable之后才能进行反向传播求梯度
+        real_label = Variable(torch.ones(imgs.size(0), 1)).to(device)  ## 定义真实的图片label为1
+        fake_label = Variable(torch.zeros(imgs.size(0), 1)).to(device)  ## 定义假的图片的label为0
 
         ## ---------------------
         ##  Train Discriminator
@@ -156,7 +157,7 @@ for epoch in range(opt["n_epochs"]):  ## epoch:50
         real_scores = real_out  ## 得到真实图片的判别值，输出的值越接近1越好
         ## 计算假的图片的损失
         ## detach(): 从当前计算图中分离下来避免梯度传到G，因为G不用更新
-        z = Variable(torch.randn(imgs.size(0), opt["latent_dim"])).cuda()  ## 随机生成一些噪声, 大小为(64, 100)
+        z = Variable(torch.randn(imgs.size(0), opt["latent_dim"])).to(device)  ## 随机生成一些噪声, 大小为(64, 100)
         fake_img = generator(z).detach()  ## 随机噪声放入生成网络中，生成一张假的图片。
         fake_out = discriminator(fake_img)  ## 判别器判断假的图片
         loss_fake_D = criterion(fake_out, fake_label)  ## 得到假的图片的loss
@@ -175,7 +176,7 @@ for epoch in range(opt["n_epochs"]):  ## epoch:50
         ## 反向传播更新的参数是生成网络里面的参数，
         ## 这样可以通过更新生成网络里面的参数，来训练网络，使得生成的图片让判别器以为是真的, 这样就达到了对抗的目的
         ## -----------------
-        z = Variable(torch.randn(imgs.size(0), opt["latent_dim"])).cuda()  ## 得到随机噪声
+        z = Variable(torch.randn(imgs.size(0), opt["latent_dim"])).to(device)  ## 得到随机噪声
         fake_img = generator(z)  ## 随机噪声输入到生成器中，得到一副假的图片
         output = discriminator(fake_img)  ## 经过判别器得到的结果
         ## 损失函数和优化
