@@ -115,6 +115,15 @@ class Generator(nn.Module):
 generator = Generator()
 discriminator = Discriminator()
 
+from thop import profile
+
+input = torch.zeros((1, 1, 28, 28)).to(device)
+flops, params = profile(discriminator.to(device), inputs=(input,))
+print("=================")
+print("flops:", flops)
+print("params:", params)
+print("=================")
+
 ## 首先需要定义loss的度量方式  （二分类的交叉熵）
 criterion = torch.nn.BCELoss()
 
@@ -209,3 +218,15 @@ for epoch in range(opt["n_epochs"]):  ## epoch:50
 ## 保存模型
 torch.save(generator.state_dict(), './save/gan/generator.pth')
 torch.save(discriminator.state_dict(), './save/gan/discriminator.pth')
+
+# checkpoint = {
+#     "model": model.state_dict(),
+#     "optimizer": optimizer.state_dict(),
+#     "lr_scheduler": scheduler.state_dict(),
+#     "epoch": epoch,
+# }
+#
+# torch.save(checkpoint, out_dir + "last.pt")
+# if acc_val == max(val_acc_list):
+#     torch.save(checkpoint, out_dir + "best.pt")
+#     print("save epoch {} model".format(epoch))
