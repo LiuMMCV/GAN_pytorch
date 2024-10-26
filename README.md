@@ -5,6 +5,7 @@
 ```
 git clone https://github.com/LiuMMCV/GAN_pytorch.git
 cd GAN_pytorch
+pip install -r requirements.txt
 python main.py
 ```
 
