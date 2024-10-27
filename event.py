@@ -2,6 +2,8 @@ import argparse
 import numpy as np
 import torch.nn as nn
 import torch
+from thop import profile, clever_format
+from torchsummary import summary
 
 
 # 将图片28x28展开成784，然后通过多层感知器，中间经过斜率设置为0.2的LeakyReLU激活函数，
@@ -73,7 +75,8 @@ def cal_time(model, x):
             end_event.synchronize()
             time_list.append(start_event.elapsed_time(end_event) / 1000)
 
-        print(f"event avg time: {sum(time_list[5:]) / len(time_list[5:]):.5f}")
+        print(f"event avg time: {sum(time_list[5:]) / len(time_list[5:]):.5f} s")
+        print(f"FPS: {len(time_list[5:]) / sum(time_list[5:]):.5f}")
 
 
 def main(opt):
@@ -95,11 +98,33 @@ def main(opt):
     # print("model.fc1.weight", generator.model[0].weight)
     # print("model.fc2.weight", discriminator.model[0].weight)
 
+    print("========discriminator=========")
+    # 模拟输入
     x = torch.randn(size=(opt.batch_size, opt.channels, opt.img_size, opt.img_size), device=device)
+    # 打印网络结构
+    summary(discriminator, input_size=(opt.channels, opt.img_size, opt.img_size))
+    # 计算FLOPs和params
+    flops, params = profile(discriminator, inputs=(x,))
+    flops, params = clever_format([flops, params], "%.3f")  # 格式化数据
+    print("flops:", flops)
+    print("params:", params)
+    # 计算推理时间
     cal_time(discriminator, x)
+    print("========discriminator=========\n\n")
 
+    print("========generator=========")
+    # 模拟输入
     y = torch.randn(size=(opt.batch_size, opt.latent_dim), device=device)
+    # 打印网络结构
+    summary(generator, input_size=(opt.latent_dim,))
+    # 计算FLOPs和params
+    flops, params = profile(generator, inputs=(y,))
+    flops, params = clever_format([flops, params], "%.3f")  # 格式化数据
+    print("flops:", flops)
+    print("params:", params)
+    # 计算推理时间
     cal_time(generator, y)
+    print("========generator=========")
 
 
 if __name__ == '__main__':

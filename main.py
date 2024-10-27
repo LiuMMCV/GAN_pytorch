@@ -56,6 +56,21 @@ dataloader = DataLoader(
     shuffle=True,
 )
 
+def cal_time(model, x):
+    with torch.inference_mode():
+        start_event = torch.cuda.Event(enable_timing=True)
+        end_event = torch.cuda.Event(enable_timing=True)
+        time_list = []
+        for _ in range(50):
+            start_event.record()
+            ret = model(x)
+            end_event.record()
+            end_event.synchronize()
+            time_list.append(start_event.elapsed_time(end_event) / 1000)
+
+        print(f"event avg time: {sum(time_list[5:]) / len(time_list[5:]):.5f} s")
+        print(f"FPS: {len(time_list[5:]) / sum(time_list[5:]):.5f}")
+
 
 ## ##### 定义判别器 Discriminator ######
 ## 将图片28x28展开成784，然后通过多层感知器，中间经过斜率设置为0.2的LeakyReLU激活函数，
@@ -112,17 +127,8 @@ class Generator(nn.Module):
 
 
 ## 创建生成器，判别器对象
-generator = Generator()
-discriminator = Discriminator()
-
-from thop import profile
-
-input = torch.zeros((1, 1, 28, 28)).to(device)
-flops, params = profile(discriminator.to(device), inputs=(input,))
-print("=================")
-print("flops:", flops)
-print("params:", params)
-print("=================")
+generator = Generator().to(device)
+discriminator = Discriminator().to(device)
 
 ## 首先需要定义loss的度量方式  （二分类的交叉熵）
 criterion = torch.nn.BCELoss()
@@ -137,6 +143,44 @@ if torch.cuda.is_available():
     generator = generator.to(device)
     discriminator = discriminator.to(device)
     criterion = criterion.to(device)
+
+
+from thop import profile, clever_format
+from torchsummary import summary
+
+print("========discriminator=========")
+# 模拟输入
+x = torch.randn(size=(opt["batch_size"], opt["channels"], opt["img_size"], opt["img_size"]), device=device)
+# 打印网络结构
+summary(discriminator, input_size=(opt["channels"], opt["img_size"], opt["img_size"]))
+# 计算FLOPs和params
+flops, params = profile(discriminator, inputs=(x,))
+flops, params = clever_format([flops, params], "%.3f")  # 格式化数据
+print("flops:", flops)
+print("params:", params)
+# 计算推理时间
+cal_time(discriminator, x)
+print("========discriminator=========\n\n")
+
+print("========generator=========")
+# 模拟输入
+y = torch.randn(size=(opt["batch_size"], opt["latent_dim"]), device=device)
+# 打印网络结构
+summary(generator, input_size=(opt["latent_dim"],))
+# 计算FLOPs和params
+flops, params = profile(generator, inputs=(y,))
+flops, params = clever_format([flops, params], "%.3f")  # 格式化数据
+print("flops:", flops)
+print("params:", params)
+# 计算推理时间
+cal_time(generator, y)
+print("========generator=========")
+
+
+from torch.utils.tensorboard import SummaryWriter
+writer = SummaryWriter(log_dir="summary_pic")
+# tensorboard --logdir=summary_pic
+
 
 ## ----------
 ##  Training
@@ -214,6 +258,12 @@ for epoch in range(opt["n_epochs"]):  ## epoch:50
         batches_done = epoch * len(dataloader) + i
         if batches_done % opt["sample_interval"] == 0:
             save_image(fake_img.data[:25], "./images/gan/%d.png" % batches_done, nrow=5, normalize=True)
+
+    writer.add_scalar("loss_D", running_loss_D, epoch)
+    writer.add_scalar("loss_G", running_loss_G, epoch)
+    writer.add_scalar("lr", optimizer_G.param_groups[0]['lr'], epoch)
+
+writer.close()
 
 ## 保存模型
 torch.save(generator.state_dict(), './save/gan/generator.pth')
